@@ -13,7 +13,7 @@ function DesignTag1({ tag, scale }) {
   return (
     <div style={{
       width: '100%', height: '100%',
-      border: `${tag.borderWidth}px solid #1a1a2e`,
+      border: `${tag.borderWidth}px solid #6400b8`,
       borderRadius: 4, background: '#fff',
       display: 'flex', flexDirection: 'column',
       overflow: 'hidden', boxSizing: 'border-box',
@@ -23,7 +23,7 @@ function DesignTag1({ tag, scale }) {
         {(tag.variables || []).map((v) => (
           <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: f(0.78), borderBottom: '1px dashed #e5e7eb', padding: '1px 0' }}>
             <span style={{ color: '#666', fontFamily: 'Georgia, serif' }}>{v.label}:</span>
-            <span style={{ fontWeight: 700, color: '#1a1a2e', fontFamily: 'Georgia, serif' }}>{v.value}</span>
+            <span style={{ fontWeight: 700, color: '#6400b8', fontFamily: 'Georgia, serif' }}>{v.value}</span>
           </div>
         ))}
       </div>
@@ -40,7 +40,7 @@ function DesignTag2({ tag, scale }) {
   return (
     <div style={{
       width: '100%', height: '100%',
-      border: `${tag.borderWidth}px solid #c8922a`,
+      border: `${tag.borderWidth}px solid #6400b8`,
       borderRadius: 8, background: 'linear-gradient(135deg, #fffdf5 60%, #fef3dc)',
       display: 'flex', flexDirection: 'column',
       overflow: 'hidden', boxSizing: 'border-box',
@@ -52,7 +52,7 @@ function DesignTag2({ tag, scale }) {
           </div>
         ))}
       </div>
-      <div style={{ textAlign: 'center', fontSize: f(0.65), color: '#c8922a', padding: '2px 0' }}>
+      <div style={{ textAlign: 'center', fontSize: f(0.65), color: '#6400b8', padding: '2px 0' }}>
         {tag.codeType === 'qr' ? '▣ QR' : '||| BARCODE |||'}
       </div>
     </div>

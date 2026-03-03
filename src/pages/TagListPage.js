@@ -22,32 +22,33 @@ export default function TagListPage({ onNavigate }) {
       {/* HEADER */}
       <div style={{
         background: 'linear-gradient(135deg, #6400b8 0%, #6400b8 100%)',
+        // background: 'linear-gradient(to right, #6400b8, #8d0096)',
         padding: '0 24px',
         boxShadow: '0 4px 24px rgba(0,0,0,0.2)',
       }}>
         <div style={{ maxWidth: 900, margin: '0 auto', padding: '18px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg, #c8922a, #e8b84b)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(255, 255, 255, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Tag size={20} color="#fff" />
             </div>
             <div>
-              <h1 style={{ margin: 0, color: '#fff', fontSize: 20, fontWeight: 800, letterSpacing: 0.5 }}>TagCraft</h1>
-              <p style={{ margin: 0, color: '#94a3b8', fontSize: 12 }}>Customize your tags</p>
+              <h1 style={{ margin: 0, color: '#fff', fontSize: 20, fontWeight: 700, letterSpacing: 0.5 }}>TagCraft</h1>
+              {/* <p style={{ margin: 0, color: '#94a3b8', fontSize: 12 }}>Customize your tags</p> */}
             </div>
           </div>
           <button
             onClick={() => onNavigate('customize', null)}
             style={{
               display: 'flex', alignItems: 'center', gap: 8,
-              background: 'linear-gradient(135deg, #c8922a, #e8b84b)',
+              background: 'rgba(255, 255, 255, 0.25)',
               border: 'none', borderRadius: 12, padding: '10px 20px',
               color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer',
-              boxShadow: '0 4px 16px rgba(200,146,42,0.4)',
+              
               transition: 'transform 0.2s, box-shadow 0.2s',
               fontFamily: '"DM Sans", sans-serif',
             }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(200,146,42,0.5)'; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(200,146,42,0.4)'; }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)';  }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)';  }}
           >
             <Plus size={18} />
             Add Tag
@@ -70,7 +71,7 @@ export default function TagListPage({ onNavigate }) {
               transition: 'border 0.2s', fontFamily: '"DM Sans", sans-serif',
               boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
             }}
-            onFocus={e => { e.target.style.border = '2px solid #c8922a'; }}
+            onFocus={e => { e.target.style.border = '2px solid #6400b8'; }}
             onBlur={e => { e.target.style.border = '2px solid #e5e7eb'; }}
           />
           {search && (
@@ -104,7 +105,7 @@ export default function TagListPage({ onNavigate }) {
                 tag={tag}
                 onEdit={() => onNavigate('customize', tag)}
                 onDelete={() => setDeleteTarget(tag)}
-                designColor={DESIGN_COLORS[tag.design] || '#1a1a2e'}
+                designColor={  '#6400b8'}
               />
             ))}
           </div>
