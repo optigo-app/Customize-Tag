@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import JsBarcode from "jsbarcode";
 
-function BarcodeGenerator({ value = "dummy", width = 30, height = 15 }) {
+function BarcodeGenerator({ value = ".......", width = 30, height = 15 }) {
   const svgRef = useRef(null);
 
   const mmToPx = (mm) => (mm * 96) / 25.4;

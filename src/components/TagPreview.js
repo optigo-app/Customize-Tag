@@ -6,7 +6,7 @@ const INCH_TO_PX = 96;
 function toPx(value, unit) {
   return unit === 'inch' ? value * INCH_TO_PX : value * MM_TO_PX;
 }
-
+ 
 // ─── Design 1: Classic dark header ───────────────────────────────────────────
 function DesignTag1({ tag, scale }) {
   const f = (n) => tag.fontSize * scale * n;
@@ -20,9 +20,9 @@ function DesignTag1({ tag, scale }) {
     }}>
 
       <div style={{ flex: 1, padding: `${scale * 1.5}px ${scale * 5}px`, overflow: 'hidden' }}>
-        {(tag.variables || []).map((v) => (
+        {(tag.placedVariables || []).map((v) => (
           <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: f(0.78), borderBottom: '1px dashed #e5e7eb', padding: '1px 0' }}>
-            <span style={{ color: '#666', fontFamily: 'Georgia, serif' }}>{v.label}:</span>
+            <span style={{ color: '#666', fontFamily: 'Georgia, serif' }}>{v.varId}:</span>
             <span style={{ fontWeight: 700, color: '#6400b8', fontFamily: 'Georgia, serif' }}>{v.value}</span>
           </div>
         ))}
@@ -130,13 +130,17 @@ export default function TagPreview({ tag, maxWidth = 320, maxHeight = 220 }) {
   const rawH = toPx(tag.height || 30, tag.unit || 'mm');
 
   // Scale to fit, allow up to 2× for small tags so they look big in preview
+
+  
+  console.log("TCL: TagPreview -> tag", tag)
   const scaleW = maxWidth / rawW;
   const scaleH = maxHeight / rawH;
   const scale = Math.min(scaleW, scaleH, 2.2);
 
   const dispW = rawW * scale;
   const dispH = rawH * scale;
-
+  
+  console.log("TCL: TagPreview -> tag", tag)
   const DesignComponent = DESIGN_COMPONENTS[tag.design] || DesignTag1;
 
   return (

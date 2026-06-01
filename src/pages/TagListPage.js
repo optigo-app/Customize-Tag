@@ -1,21 +1,31 @@
 import React, { useState } from 'react';
-import { Plus, Search, Pencil, Trash2, Tag, X } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Tag, X, Copy } from 'lucide-react';
 import { useTags } from '../context/TagContext';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import TagPreview from '../components/TagPreview';
+
 
 const DESIGN_COLORS = {
   tag1: '#1a1a2e', tag2: '#c8922a', tag3: '#2d6a4f', tag4: '#e63946',
 };
 
 export default function TagListPage({ onNavigate }) {
-  const { tags, deleteTag } = useTags();
+  const { tags, deleteTag, addTag } = useTags();
   const [search, setSearch] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
 
   const filtered = tags.filter((t) =>
     t.name.toLowerCase().includes(search.toLowerCase())
   );
+  const cloneTag = (tag) => {
+    const newTag = {
+      ...tag,
+      id: Date.now().toString(),
+      name: tag.name + " Copy"
+    };
+
+    addTag(newTag);
+  };
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8f9fe', fontFamily: '"DM Sans", sans-serif' }}>
@@ -43,12 +53,12 @@ export default function TagListPage({ onNavigate }) {
               background: 'rgba(255, 255, 255, 0.25)',
               border: 'none', borderRadius: 12, padding: '10px 20px',
               color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer',
-              
+
               transition: 'transform 0.2s, box-shadow 0.2s',
               fontFamily: '"DM Sans", sans-serif',
             }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)';  }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)';  }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; }}
           >
             <Plus size={18} />
             Add Tag
@@ -100,12 +110,20 @@ export default function TagListPage({ onNavigate }) {
         ) : (
           <div style={{ display: 'grid', gap: 16 }}>
             {filtered.map((tag) => (
+              // <TagCard
+              //   key={tag.id}
+              //   tag={tag}
+              //   onEdit={() => onNavigate('customize', tag)}
+              //   onDelete={() => setDeleteTarget(tag)}
+              //   designColor={  '#6400b8'}
+              // />
               <TagCard
                 key={tag.id}
                 tag={tag}
                 onEdit={() => onNavigate('customize', tag)}
                 onDelete={() => setDeleteTarget(tag)}
-                designColor={  '#6400b8'}
+                onClone={() => cloneTag(tag)}
+                designColor={'#6400b8'}
               />
             ))}
           </div>
@@ -123,7 +141,7 @@ export default function TagListPage({ onNavigate }) {
   );
 }
 
-function TagCard({ tag, onEdit, onDelete, designColor }) {
+function TagCard({ tag, onEdit, onDelete, onClone, designColor }) {
   const [hovered, setHovered] = useState(false);
 
   return (
@@ -144,6 +162,8 @@ function TagCard({ tag, onEdit, onDelete, designColor }) {
         <TagPreview tag={tag} maxWidth={140} maxHeight={80} />
       </div>
 
+
+
       {/* Info */}
       <div style={{ flex: 1, minWidth: 120 }}>
         <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: '#1a1a2e' }}>{tag.name}</h3>
@@ -158,6 +178,13 @@ function TagCard({ tag, onEdit, onDelete, designColor }) {
       {/* Actions */}
       <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
         <ActionBtn icon={<Pencil size={16} />} label="Edit" color="#3b82f6" onClick={onEdit} />
+        <ActionBtn
+          icon={<Copy size={16} />}
+          label="Clone"
+          color="#10b981"
+          onClick={onClone}
+        />
+
         <ActionBtn icon={<Trash2 size={16} />} label="Delete" color="#e63946" onClick={onDelete} />
       </div>
     </div>

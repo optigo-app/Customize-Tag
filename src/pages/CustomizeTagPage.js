@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-
+import { useTags } from "../context/TagContext";
 import './CustomizeTagPage.scss'
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
@@ -13,6 +13,9 @@ import generateBarcodeSVG from '../components/generateBarcodeSVG'
 import QRCodeGenerator from '../components/QRCodeGenerator'
 import generateQRCodeSVG from '../components/generateQRCodeSVG'
 import Tooltip from '@mui/material/Tooltip';
+import { Snackbar, Alert } from "@mui/material";
+import { CommonAPI } from "../api/api";
+import SaveApi from "../api/SaveApi";
 
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -43,80 +46,55 @@ function toPx(v, u) {
 const ACCENT = { tag1: '#1a1a2e', tag2: '#c8922a', tag3: '#2d6a4f', tag4: '#e63946' };
 
 // ─── STATIC SP / VARIABLE JSON ────────────────────────────────────────────────
-const SP_DATA = [
-  {
-    id: 'sp1', name: 'SP 1 — Weight Info',
-    variables: [
-      { id: 'sp1_v1', label: 'Gross Weight', key: 'GrossWt', unit: 'GM' },
-      { id: 'sp1_v2', label: 'Net Weight', key: 'NetWt', unit: 'GM' },
-      { id: 'sp1_v3', label: 'Stone Weight', key: 'StoneWt', unit: 'GM' },
-      { id: 'sp1_v4', label: 'Metal Weight', key: 'MetalWt', unit: 'GM' },
-      { id: 'sp1_v5', label: 'Polish Weight', key: 'PolishWt', unit: 'GM' },
-      { id: 'sp1_v6', label: 'Tola Weight', key: 'TolaWt', unit: 'Tola' },
-      { id: 'sp1_v7', label: 'Carat Weight', key: 'CaratWt', unit: 'ct' },
-      { id: 'sp1_v8', label: 'Wax Weight', key: 'WaxWt', unit: 'GM' },
-      { id: 'sp1_v9', label: 'Dust Weight', key: 'DustWt', unit: 'GM' },
-      { id: 'sp1_v10', label: 'Final Weight', key: 'FinalWt', unit: 'GM' },
-    ]
-  },
-  {
-    id: 'sp2', name: 'SP 2 — Pricing',
-    variables: [
-      { id: 'sp2_v1', label: 'Rate', key: 'Rate', unit: '₹/GM' },
-      { id: 'sp2_v2', label: 'Making Charge', key: 'MakingChg', unit: '₹' },
-      { id: 'sp2_v3', label: 'Stone Price', key: 'StonePrice', unit: '₹' },
-      { id: 'sp2_v4', label: 'Total Amount', key: 'TotalAmt', unit: '₹' },
-      { id: 'sp2_v5', label: 'GST', key: 'GST', unit: '%' },
-      { id: 'sp2_v6', label: 'Discount', key: 'Discount', unit: '%' },
-      { id: 'sp2_v7', label: 'Net Amount', key: 'NetAmt', unit: '₹' },
-      { id: 'sp2_v8', label: 'Gold Rate', key: 'GoldRate', unit: '₹' },
-      { id: 'sp2_v9', label: 'Silver Rate', key: 'SilverRate', unit: '₹' },
-      { id: 'sp2_v10', label: 'Market Price', key: 'MktPrice', unit: '₹' },
-    ]
-  },
-  {
-    id: 'sp3', name: 'SP 3 — Product Info',
-    variables: [
-      { id: 'sp3_v1', label: 'Item Code', key: 'ItemCode', unit: '' },
-      { id: 'sp3_v2', label: 'Item Name', key: 'ItemName', unit: '' },
-      { id: 'sp3_v3', label: 'Category', key: 'Category', unit: '' },
-      { id: 'sp3_v4', label: 'Sub Category', key: 'SubCat', unit: '' },
-      { id: 'sp3_v5', label: 'Purity', key: 'Purity', unit: 'K' },
-      { id: 'sp3_v6', label: 'Karat', key: 'Karat', unit: 'K' },
-      { id: 'sp3_v7', label: 'Color', key: 'Color', unit: '' },
-      { id: 'sp3_v8', label: 'Size', key: 'Size', unit: '' },
-      { id: 'sp3_v9', label: 'Design No', key: 'DesignNo', unit: '' },
-      { id: 'sp3_v10', label: 'Collection', key: 'Collection', unit: '' },
-    ]
-  },
-  {
-    id: 'sp4', name: 'SP 4 — Stone Details',
-    variables: [
-      { id: 'sp4_v1', label: 'Stone Name', key: 'StoneName', unit: '' },
-      { id: 'sp4_v2', label: 'Stone Pcs', key: 'StonePcs', unit: 'pcs' },
-      { id: 'sp4_v3', label: 'Stone Carat', key: 'StoneCt', unit: 'ct' },
-      { id: 'sp4_v4', label: 'Diamond Pcs', key: 'DiamondPcs', unit: 'pcs' },
-      { id: 'sp4_v5', label: 'Diamond Ct', key: 'DiamondCt', unit: 'ct' },
-      { id: 'sp4_v6', label: 'Ruby Pcs', key: 'RubyPcs', unit: 'pcs' },
-      { id: 'sp4_v7', label: 'Emerald Pcs', key: 'EmeraldPcs', unit: 'pcs' },
-      { id: 'sp4_v8', label: 'Stone Clarity', key: 'StoneClr', unit: '' },
-      { id: 'sp4_v9', label: 'Stone Color', key: 'StoneColor', unit: '' },
-      { id: 'sp4_v10', label: 'Stone Quality', key: 'StoneQual', unit: '' },
-    ]
-  },
+
+export const fetchDashboardData = async () => {
+  try {
+    let apiurl = 'http://newnextjs.web/api/report';
+
+    // const newbody = {
+    //   con: JSON.stringify({
+    //     mode: mode,
+    //     DBNAME: "Orail25",
+    //   }),
+    //   p: JSON.stringify({
+    //     WhereClause:
+    //       "where Stock_design.StockBarcode_WOUS in ('1/5566')",
+    //     tagvalue: "",
+    //     StockBarcodeList: "1/5566",
+    //   }),
+    //   f: "test jenis (getspData)",
+    // };
+    
+    const newbody={
+      "con": "{\"id\":\"\",\"mode\":\"getspcols\",\"y\":\"\",\"appuserid\":\"soha@eg.com\",\"IPAddress\":\"192.168.1.98\"}",
+      "p": "{}",
+      "f": "TagPrintConfiguration"
+      }
+    const response = await CommonAPI(newbody, 168);
+ 
+
+
+    if (response?.Status === '200') {
+      return  response?.Data;
+    } else {
+      return []; // Empty array if no data or status is not 200
+    }
+  } catch (error) {
+    console.log('API Error:', error);
+    return []; // Return empty array on error
+  }
+};
+
+
+
+
+
+const STATIC_SP_DATA = [
   {
     id: 'sp5', name: 'SP 5 — Business Info',
     variables: [
       { id: 'sp5_v1', label: 'Shop Name', key: 'ShopName', unit: '' },
-      { id: 'sp5_v2', label: 'Invoice No', key: 'InvoiceNo', unit: '' },
-      { id: 'sp5_v3', label: 'Date', key: 'Date', unit: '' },
-      { id: 'sp5_v4', label: 'Customer Name', key: 'CustName', unit: '' },
-      { id: 'sp5_v5', label: 'Salesman', key: 'Salesman', unit: '' },
-      { id: 'sp5_v6', label: 'Branch', key: 'Branch', unit: '' },
-      { id: 'sp5_v7', label: 'Counter No', key: 'CounterNo', unit: '' },
-      { id: 'sp5_v8', label: 'Lot No', key: 'LotNo', unit: '' },
-      { id: 'sp5_v9', label: 'Serial No', key: 'SerialNo', unit: '' },
-      { id: 'sp5_v10', label: 'Batch No', key: 'BatchNo', unit: '' },
+      // ...rest of sp5 variables
     ]
   },
 ];
@@ -142,6 +120,7 @@ const EMPTY_TAG = {
   selectedSp: '',
   barcodeval: '',
   qrcodeval: '',
+  html: '',
 };
 
 
@@ -248,6 +227,8 @@ function makeLabelStyle() { return { fontSize: 11, fontWeight: '800', color: '#1
 
 function VarCustomizePopover({ instance, spId, varDef, onUpdate, onClose }) {
   const [s, setS] = useState({ ...makeVarStyle(), ...(instance.style || {}) });
+  const [dropOpen, setDropOpen] = useState(false);
+  const [decimal, setDecimal] = useState(0);
   const upd = (k, v) => setS(p => ({ ...p, [k]: v }));
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
@@ -294,7 +275,7 @@ function VarCustomizePopover({ instance, spId, varDef, onUpdate, onClose }) {
 
 
           <div style={{ display: "flex", gap: 10 }}>
-            <div style={{ width: "50%" }}>
+            <div style={{ width: "50%", position: "relative" }}>
 
               <div style={{
                 fontSize: 11,
@@ -305,7 +286,7 @@ function VarCustomizePopover({ instance, spId, varDef, onUpdate, onClose }) {
               }}>
                 Decimal Places
               </div>
-              <select
+              {/* <select
                 value={s.decimal}
                 onChange={e => upd('decimal', Number(e.target.value))}
                 onFocus={e => e.target.style.borderColor = '#7c3aed'}
@@ -327,7 +308,58 @@ function VarCustomizePopover({ instance, spId, varDef, onUpdate, onClose }) {
                     {d} Decimal{d !== 1 ? 's' : ''}
                   </option>
                 ))}
-              </select>
+              </select> */}
+              <button
+                onClick={() => setDropOpen(o => !o)}
+                // onFocus={e => e.target.style.borderColor = '#7c3aed'} onBlur={e => e.target.style.borderColor = '#e5e7eb'}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 13px', borderRadius: 11, border: `2px solid ${dropOpen ? '#7c3aed' : '#e5e7eb'}`, background: '#fff', cursor: 'pointer', fontFamily: 'inherit', boxSizing: 'border-box', transition: 'border-color 0.2s' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a2e' }}>{decimal}</span>
+                </div>
+                <div style={{ transform: dropOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', color: '#94a3b8' }}><ChevronDown size={15} /></div>
+              </button>
+              {dropOpen && (
+                <div style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 5px)',
+                  left: 0,
+                  right: 0,
+                  background: '#fff',
+                  borderRadius: 11,
+                  border: '2px solid #e5e7eb',
+                  boxShadow: '0 12px 40px rgba(0,0,0,0.14)',
+                  zIndex: 500,
+                  overflow: 'hidden'
+                }}>
+                  {[0, 1, 2, 3, 4, 5].map((sp, idx) => (
+                    <div
+                      key={sp}
+
+                      onClick={() => {
+                        setDecimal(sp);
+                        setDropOpen(false);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '10px 13px',
+                        cursor: 'pointer',
+                        background: decimal === sp ? 'rgb(196, 181, 253)' : '#fff',
+                        borderBottom: idx < 3 ? '1px solid #f1f5f9' : 'none',
+                        transition: 'background 0.12s'
+                      }}
+                      onMouseEnter={e => { if (decimal !== sp) e.currentTarget.style.background = '#f8f9fe'; }}
+                      onMouseLeave={e => { if (decimal !== sp) e.currentTarget.style.background = '#fff'; }}
+                    >
+                      <span style={{ fontSize: 13, fontWeight: 700, color: decimal === sp ? 'black' : '#1a1a2e' }}>{sp}</span>
+
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div style={{ width: "50%" }}>
@@ -474,7 +506,6 @@ function generateExactTagHTML(tag, layout, placedVariables, placedLabels) {
 
   const bodyWidth = tag.headWidth || tag.width;
   const tailWidth = Number(tag.width) - Number(bodyWidth);
-
   const BG = {
     tag1: `
       background:#fff;
@@ -498,7 +529,8 @@ function generateExactTagHTML(tag, layout, placedVariables, placedLabels) {
   };
 
   return `
-  <div style="
+  <html>
+  <div style='
     width:${tag.width}${tag.unit};
     height:${tag.height}${tag.unit};
     position:relative;
@@ -506,42 +538,43 @@ function generateExactTagHTML(tag, layout, placedVariables, placedLabels) {
     font-family:${tag.tagFontFamilly};
     box-sizing:border-box;
     ${BG[tag.design] || BG.tag1}
-  ">
+  '>
 
     <!-- BODY -->
-    <div style="
+    <div style='
       width:${bodyWidth}${tag.unit};
       height:100%;
       position:absolute;
       left:0;
       
       display:flex;
-    ">
+    '>
 
-      <div style="width:50%;height:100%; ">
-        <div style="height:50%;"></div>
-        <div style="height:50%;"></div>
+      <div style='width:50%;height:100%; '>
+        <div style='height:50%;'></div>
+        <div style='height:50%;'></div>
       </div>
 
-      <div style="width:50%;height:100%;">
-        <div style="height:50%;"></div>
-        <div style="height:50%;"></div>
+      <div style='width:50%;height:100%;'>
+        <div style='height:50%;'></div>
+        <div style='height:50%;'></div>
       </div>
     </div>
 
     <!-- TAIL -->
     ${tailWidth > 0 ? `
-      <div style="
+      <div style='
         position:absolute;
         right:0;
         width:${tailWidth}${tag.unit};
         height:100%;
-      "></div>
-    ` : ""}
+      '></div>
+    ` : ''}
 
     <!-- VARIABLES -->
     ${placedVariables.map(v => `
-      <div style="
+      
+      <div style='
         position:absolute;
         left:${v.x}%;
         top:${v.y}%;
@@ -553,14 +586,14 @@ function generateExactTagHTML(tag, layout, placedVariables, placedLabels) {
         padding:2px 6px;
         border-radius:3px;
         
-      ">
-        {{${v.varId}}}${v.style?.unit ? " " + v.style.unit : ""}
+      '>
+        ${v.varLabel}${v.style?.unit ? ' ' + v.style.unit : ''}
       </div>
-    `).join("")}
+    `).join('')}
 
     <!-- LABELS -->
     ${placedLabels.map(l => `
-      <div style="
+      <div style='
         position:absolute;
         left:${l.x}%;
         top:${l.y}%;
@@ -572,48 +605,51 @@ function generateExactTagHTML(tag, layout, placedVariables, placedLabels) {
         padding:${l.style?.bg !== 'transparent' ? '2px 6px' : '0'};
         border-radius:3px;
         white-space:nowrap;
-      ">
+      '>
         ${l.text}
       </div>
-    `).join("")}
+    `).join('')}
 
     <!-- BARCODE -->
     ${tag.showBarcode ? `
-      <div style="
+      <div style='
         position:absolute;
         left:${layout.barcode?.x || 5}%;
         top:${layout.barcode?.y || 76}%;
-      ">
+      '>
         ${generateBarcodeSVG(
-    tag?.barcodeval?.id || "dummy",
+    tag?.barcodeval?.key || 'dummy',
     tag.codeWidth,
     tag.codeHeight
   )}
       </div>
-    ` : ""}
+    ` : ''}
 
     <!-- QR -->
     ${tag.showQR ? `
-      <div style="
+      <div style='
         position:absolute;
         left:${layout.qr?.x || 55}%;
         top:${layout.qr?.y || 76}%;
         width:${tag.qrSize || 12}mm;
         height:${tag.qrSize || 12}mm;
-      ">
+      '>
        ${generateQRCodeSVG(
-    tag?.qrcodeval?.id || "dummy",
+    tag?.qrcodeval?.id || 'dummy',
     tag.qrSize || 12
   )}
       </div>
-    ` : ""}
+    ` : ''}
 
   </div>
+   </html>
   `;
 }
 
 
-function DraggableCanvas({ tag, layout, onLayoutChange, placedVariables, placedLabels, onRemovePlaced, onEditInstance, onRemoveLabel, onEditLabel }) {
+function DraggableCanvas({ tag, layout, onLayoutChange, placedVariables, placedLabels, onRemovePlaced, onEditInstance, onRemoveLabel, onEditLabel, spData }) {
+
+
   const CANVAS_W = 1000, CANVAS_H = 1000;
   const rawW = toPx(tag.width || 60, tag.unit || 'mm');
   const rawH = toPx(tag.height || 30, tag.unit || 'mm');
@@ -625,6 +661,7 @@ function DraggableCanvas({ tag, layout, onLayoutChange, placedVariables, placedL
   const [dragging, setDragging] = useState(null);
   const [hoveredEl, setHoveredEl] = useState(null);
   const clamp = v => Math.min(Math.max(v, 0), 94);
+
 
   //tag zooming effects
   const [zoom, setZoom] = useState(1); // 1 = 100%
@@ -663,7 +700,6 @@ function DraggableCanvas({ tag, layout, onLayoutChange, placedVariables, placedL
       const nx = clamp(
         dragging.startPX + (deltaX / dispW) * 250
       );
-
       const ny = clamp(
         dragging.startPY + (deltaY / dispH) * 250
       );
@@ -680,16 +716,12 @@ function DraggableCanvas({ tag, layout, onLayoutChange, placedVariables, placedL
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); window.removeEventListener('touchmove', onMove); window.removeEventListener('touchend', onUp); };
   }, [dragging, dispW, dispH, layout, onLayoutChange]);
 
-  // ─── FIX: DEl now wraps buttons INSIDE the hover zone ──────────────────────
-  // Key changes:
-  // 1. paddingTop on the wrapper so buttons are physically inside the element bounds
-  // 2. Buttons rendered BELOW the dashed border in a separate div that's part of the same wrapper
-  // 3. onMouseLeave uses relatedTarget check to prevent hiding when moving to action buttons
+
   function DEl({ elKey, color, children, onDelete, onEdit }) {
     const p = getPos(elKey);
     const active = dragging?.key === elKey;
     const isHovered = hoveredEl === elKey;
-    const BUTTON_H = 24; // height reserved for action buttons above content
+    const BUTTON_H = 10; // height reserved for action buttons above content
     const [open, setOpen] = React.useState(false);
 
     const handleClickOpen = () => {
@@ -699,11 +731,6 @@ function DraggableCanvas({ tag, layout, onLayoutChange, placedVariables, placedL
     const handleClose = () => {
       setOpen(false);
     };
-
-
-
-
-
 
     return (
       <div
@@ -745,7 +772,7 @@ function DraggableCanvas({ tag, layout, onLayoutChange, placedVariables, placedL
                 background: '#0284c7',
                 color: '#fff',
                 borderRadius: 20,
-                padding: '3px 9px',
+                padding: '1px 3px',
                 fontSize: 9,
                 fontWeight: 800,
                 whiteSpace: 'nowrap',
@@ -756,7 +783,7 @@ function DraggableCanvas({ tag, layout, onLayoutChange, placedVariables, placedL
                 lineHeight: 1,
               }}
             >
-              ✏ Edit
+              ✏
             </div>
           )}
           {onDelete && (
@@ -768,7 +795,7 @@ function DraggableCanvas({ tag, layout, onLayoutChange, placedVariables, placedL
                 background: '#e63946',
                 color: '#fff',
                 borderRadius: 20,
-                padding: '3px 9px',
+                padding: '1px 3px',
                 fontSize: 9,
                 fontWeight: 800,
                 whiteSpace: 'nowrap',
@@ -779,7 +806,7 @@ function DraggableCanvas({ tag, layout, onLayoutChange, placedVariables, placedL
                 lineHeight: 1,
               }}
             >
-              ✕ Del
+              ✕
             </div>
           )}
         </div>
@@ -896,7 +923,7 @@ function DraggableCanvas({ tag, layout, onLayoutChange, placedVariables, placedL
           {/* Dashed border highlight */}
           <div style={{
             position: 'absolute',
-            inset: -4,
+            inset: -1,
             borderRadius: 5,
             border: `1.5px dashed ${color}`,
             pointerEvents: 'none',
@@ -923,9 +950,9 @@ function DraggableCanvas({ tag, layout, onLayoutChange, placedVariables, placedL
         {/* <div style={{ width: tag.codeWidth, height: tag.codeHeight, display: 'flex', gap: 0.4, overflow: 'hidden' }}>
           {Array.from({ length: 36 }).map((_, i) => <div key={i} style={{ flex: i % 3 === 0 ? 2 : 1, background: i % 5 === 0 ? '#999' : '#1a1a2e' }} />)}
         </div> */}
-        {console.log("val", tag.barcodeval)}
+
         <BarcodeGenerator
-          value={tag?.barcodeval?.id}
+          value={tag?.barcodeval?.key}
           width={tag.codeWidth}
           height={tag.codeHeight}
         />
@@ -983,11 +1010,13 @@ function DraggableCanvas({ tag, layout, onLayoutChange, placedVariables, placedL
               placedLabels
             );
 
+           
+
             const win = window.open();
             win.document.write(html);
             win.document.close();
           }
-        }>export</button>
+        }>Preview</button>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: CANVAS_W, height: CANVAS_H, position: 'relative' }}>
 
@@ -1004,7 +1033,7 @@ function DraggableCanvas({ tag, layout, onLayoutChange, placedVariables, placedL
           </svg>
 
           {placedVariables.map(pv => {
-            const sp = SP_DATA.find(s => s.id === pv.spId);
+            const sp = spData.find(s => s.id === pv.spId);
             const varDef = sp?.variables.find(v => v.id === pv.varId);
             if (!varDef) return null;
             const st = pv.style || makeVarStyle();
@@ -1013,8 +1042,8 @@ function DraggableCanvas({ tag, layout, onLayoutChange, placedVariables, placedL
               <DEl key={pv.instanceId} elKey={pv.instanceId} color="#0284c7"
                 onDelete={() => onRemovePlaced(pv.instanceId)}
                 onEdit={() => onEditInstance(pv.instanceId)}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.95)', borderRadius: 3, padding: `${Math.max(1, scale * 0.8)}px ${Math.max(2, scale * 2)}px`, boxShadow: '0 1px 4px rgba(0,0,0,0.1)', whiteSpace: 'nowrap' }}>
-                  <span style={{ fontSize: scaledFs, fontWeight: st.fontWeight, color: st.color, fontFamily: `'${tag.tagFontFamilly}'` }}>{`{{${processValue(varDef.key, st)}}}`}{st.unit ? ' ' + st.unit : ''}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.95)', borderRadius: 3, padding: `1px`, boxShadow: '0 1px 4px rgba(0,0,0,0.1)', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: scaledFs, fontWeight: st.fontWeight, color: st.color, fontFamily: `'${tag.tagFontFamilly}'` }}>{`${processValue(varDef.label, st)}`}{st.unit ? ' ' + st.unit : ''}</span>
                 </div>
               </DEl>
             );
@@ -1027,7 +1056,7 @@ function DraggableCanvas({ tag, layout, onLayoutChange, placedVariables, placedL
               <DEl key={pl.id} elKey={pl.id} color="#7c3aed"
                 onDelete={() => onRemoveLabel(pl.id)}
                 onEdit={() => onEditLabel(pl.id)}>
-                <span style={{ fontSize: scaledFs, fontWeight: st.fontWeight, color: st.color, fontStyle: st.italic ? 'italic' : 'normal', background: st.bg, padding: st.bg !== 'transparent' ? `${scale * 0.5}px ${scale * 2}px` : 0, borderRadius: 3, whiteSpace: 'nowrap', display: 'block', fontFamily: `${tag.tagFontFamilly}` }}>
+                <span style={{ fontSize: scaledFs, fontWeight: st.fontWeight, color: st.color, fontStyle: st.italic ? 'italic' : 'normal', background: st.bg, padding: "1px", borderRadius: 3, whiteSpace: 'nowrap', display: 'block', fontFamily: `${tag.tagFontFamilly}` }}>
                   {pl.text}
                 </span>
               </DEl>
@@ -1143,16 +1172,19 @@ function PanelCard({ title, icon, iconBg = 'rgb(243, 232, 255)', iconColor = '#6
   );
 }
 
-function Panel1Variables({ tag, placedVariables, onPlace, onRemovePlaced, onEditInstance }) {
-  const [selectedSp, setSelectedSp] = useState(SP_DATA[0]);
+function Panel1Variables({ tag, placedVariables, onPlace, onRemovePlaced, onEditInstance, spData }) {
+  const [selectedSp, setSelectedSp] = useState(spData[0]);
   const [dropOpen, setDropOpen] = useState(false);
   const [hovVar, setHovVar] = useState(null);
   const [selectedInstanceId, setSelectedInstanceId] = useState(null);
 
   const [open, setOpen] = React.useState(false);
+
   useEffect(() => {
-    tag.selectedSp = selectedSp;
-  }, [selectedSp]);
+    if (!selectedSp && spData.length > 0) {
+      setSelectedSp(spData[0]);
+    }
+  }, [spData]);
 
   const handleClickOpen = () => {
     setOpen(true);
@@ -1178,27 +1210,27 @@ function Panel1Variables({ tag, placedVariables, onPlace, onRemovePlaced, onEdit
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div style={{ width: 22, height: 22, borderRadius: 7, background: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 900, color: '#fff', flexShrink: 0 }}>
-                {SP_DATA.findIndex(s => s.id === selectedSp.id) + 1}
+                {spData.findIndex(s => s.id === selectedSp?.id) + 1}
               </div>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a2e' }}>{selectedSp.name}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a2e' }}>{selectedSp?.name}</span>
             </div>
             <div style={{ transform: dropOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', color: '#94a3b8' }}><ChevronDown size={15} /></div>
           </button>
           {dropOpen && (
             <div style={{ position: 'absolute', top: 'calc(100% + 5px)', left: 0, right: 0, background: '#fff', borderRadius: 11, border: '2px solid #e5e7eb', boxShadow: '0 12px 40px rgba(0,0,0,0.14)', zIndex: 500, overflow: 'hidden' }}>
-              {SP_DATA.map((sp, idx) => (
+              {spData.map((sp, idx) => (
                 <div key={sp.id}
                   onClick={() => {
                     setSelectedSp(sp);
                     tag.selectedSp = sp;
                     setDropOpen(false);
                   }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 13px', cursor: 'pointer', background: sp.id === selectedSp.id ? 'rgb(196, 181, 253)' : '#fff', borderBottom: idx < SP_DATA.length - 1 ? '1px solid #f1f5f9' : 'none', transition: 'background 0.12s' }}
-                  onMouseEnter={e => { if (sp.id !== selectedSp.id) e.currentTarget.style.background = '#f8f9fe'; }}
-                  onMouseLeave={e => { if (sp.id !== selectedSp.id) e.currentTarget.style.background = '#fff'; }}>
-                  <div style={{ width: 22, height: 22, borderRadius: 7, background: sp.id === selectedSp.id ? '#7c3aed' : '#e8eaf0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 900, color: sp.id === selectedSp.id ? '#fff' : '#64748b', flexShrink: 0 }}>{idx + 1}</div>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: sp.id === selectedSp.id ? '#6400b8' : '#1a1a2e' }}>{sp.name}</span>
-                  {sp.id === selectedSp.id && <span style={{ marginLeft: 'auto', color: '#c8922a', fontSize: 12 }}>✓</span>}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 13px', cursor: 'pointer', background: sp.id === selectedSp?.id ? 'rgb(196, 181, 253)' : '#fff', borderBottom: idx < spData.length - 1 ? '1px solid #f1f5f9' : 'none', transition: 'background 0.12s' }}
+                  onMouseEnter={e => { if (sp.id !== selectedSp?.id) e.currentTarget.style.background = '#f8f9fe'; }}
+                  onMouseLeave={e => { if (sp.id !== selectedSp?.id) e.currentTarget.style.background = '#fff'; }}>
+                  <div style={{ width: 22, height: 22, borderRadius: 7, background: sp.id === selectedSp?.id ? '#7c3aed' : '#e8eaf0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 900, color: sp.id === selectedSp?.id ? '#fff' : '#64748b', flexShrink: 0 }}>{idx + 1}</div>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: sp.id === selectedSp?.id ? '#6400b8' : '#1a1a2e' }}>{sp.name}</span>
+                  {sp.id === selectedSp?.id && <span style={{ marginLeft: 'auto', color: '#c8922a', fontSize: 12 }}>✓</span>}
                 </div>
               ))}
             </div>
@@ -1208,17 +1240,19 @@ function Panel1Variables({ tag, placedVariables, onPlace, onRemovePlaced, onEdit
 
       <div style={{ padding: '10px 12px' }}>
         <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
-          Variables ({selectedSp.variables.length})
+          Variables ({selectedSp?.variables.length})
         </div>
         <div className='Panel1_overflow' style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingBottom: 10, overflowY: 'auto', boxSizing: 'content-box', paddingRight: "5px" }}>
-          {selectedSp.variables.map((v, idx) => {
-            const placed = placedVariables.filter(p => p.varId === v.id && p.spId === selectedSp.id);
+          {selectedSp?.variables.map((v, idx) => {
+
+
+            const placed = placedVariables.filter(p => p.varId === v.id && p.spId === selectedSp?.id);
             const isHov = hovVar === v.id;
             return (
 
 
               <Tooltip
-                title={v.id}
+                title={v.key}
                 placement="left"
                 PopperProps={{
                   modifiers: [
@@ -1236,10 +1270,10 @@ function Panel1Variables({ tag, placedVariables, onPlace, onRemovePlaced, onEdit
                   onMouseEnter={() => setHovVar(v.id)}
                   onMouseLeave={() => setHovVar(null)}
                   style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 8px', borderRadius: 10, border: `2px solid ${isHov ? '#7c3aed' : placed.length > 0 ? '#6400b8' : '#f1f5f9'}`, background: isHov ? 'rgb(235 230 255)' : placed.length > 0 ? 'rgb(235 230 255)' : '#f8f9fe', transition: 'all 0.15s', cursor: 'pointer' }}
-                  onClick={() => onPlace(selectedSp.id, v.id)}
-                  tooltip="amish"
+                  onClick={() => onPlace(selectedSp?.id, v.id, v.key, v.label)}
+                  tooltip="dsds"
                 >
-                  <div style={{ width: 20, height: 20, borderRadius: 6, background: placed.length > 0 ? '#6400b8' : '#e8eaf0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 900, color: placed.length > 0 ? '#fff' : '#94a3b8', flexShrink: 0,border: isHov ? '1px solid #7c3aed' : '1px solid #e8eaf0' }}>{idx + 1}</div>
+                  <div style={{ width: 20, height: 20, borderRadius: 6, background: placed.length > 0 ? '#6400b8' : '#e8eaf0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 900, color: placed.length > 0 ? '#fff' : '#94a3b8', flexShrink: 0, border: isHov ? '1px solid #7c3aed' : '1px solid #e8eaf0' }}>{idx + 1}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: '#1a1a2e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v.label}</div>
                     <div style={{ fontSize: 10, color: '#94a3b8', fontFamily: 'monospace' }}>{`{{${v.key}}}`}{v.unit ? ` · ${v.unit}` : ''}</div>
@@ -1261,7 +1295,9 @@ function Panel1Variables({ tag, placedVariables, onPlace, onRemovePlaced, onEdit
           <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 7 }}>On Canvas ({placedVariables.length})</div>
           <div className='Panel1_overflow' style={{ display: 'flex', flexWrap: 'wrap', gap: 5, height: "100%", overflowY: 'auto' }}>
             {placedVariables.map((pv, idx) => {
-              const sp = SP_DATA.find(s => s.id === pv.spId);
+
+
+              const sp = spData.find(s => s.id === pv.spId);
               const vd = sp?.variables.find(v => v.id === pv.varId);
               if (!vd) return null;
 
@@ -1525,7 +1561,6 @@ function Panel2Settings({ tag, set, placedLabels, onAddLabel, onRemoveLabel, onE
                 const newValue = Math.min(v, tag.width);
                 set('headWidth', newValue);
               }} placeholder={`e.g. 70mm`} />
-
 
             </div>
             <div>
@@ -1998,8 +2033,135 @@ export default function CustomizeTagPage({ onNavigate, editTag }) {
   const [editingVarInstanceId, setEditingVarInstanceId] = useState(null);
   const [editingLabelId, setEditingLabelId] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
+  const { tags, addTag, updateTag } = useTags();
+  const [openAlert, setOpenAlert] = useState(false);
 
   const [open, setOpen] = React.useState(false);
+  const [spData, setSpData] = useState([]);
+
+  // useEffect(() => {
+
+
+  //   const loadSPData = async (mode) => {
+      
+      
+  //     const data = await fetchDashboardData();
+      
+  //     console.log("TCL: loadSPData -> ", data)
+  //     if (!data?.length) return;
+
+    
+  //   console.log("TCL: loadSPData -data> ", data)
+  //      const spdetail=data.rd[0];
+  //     const firstRow = data.rd1[0];
+      
+      
+  //     const dynamicVariables = Object.entries(firstRow).map(([key, value], index) => ({
+  //       id: `${spdetail?.TagSpMasterId}_v${index + 1}`,
+  //       label: key,
+  //       key: value,
+  //       unit: "",
+  //     }));
+
+ 
+  //     setSpData(prev => {
+  //       const alreadyExists = prev.some(item => item.id === spdetail?.TagSpMasterId);
+  //       if (alreadyExists) return prev;
+  //       return [...prev, { id: spdetail?.TagSpMasterId, name: spdetail?.SpName, variables: dynamicVariables }];
+  //     });
+  //   };
+
+ 
+
+
+
+
+  //   loadSPData( );
+ 
+
+  // }, []);
+
+  useEffect(() => {
+
+    const loadSPData = async () => {
+  
+      const data = await fetchDashboardData();
+  
+      console.log("TCL: loadSPData -> ", data);
+  
+      if (!data?.rd?.length || !data?.rd1?.length) return;
+  
+      const spdetail = data.rd[0];
+  
+      // Store all column details
+      const dynamicVariables = data.rd1.map((item) => ({
+        id: `${spdetail?.TagSpMasterId}_v${item.ColumnId}`,
+        columnId: item.ColumnId,
+        label: item.DisplayName,
+        key: item.ColumnName,
+        unit: "",
+      }));
+  
+      // Final SP object
+      const spObject = {
+        id: spdetail?.TagSpMasterId,
+        name: spdetail?.SpName,
+        variables: dynamicVariables,
+        spDetails: spdetail, // full sp detail
+        columns: data.rd1,   // full column list
+      };
+  
+      setSpData((prev) => {
+  
+        const alreadyExists = prev.some(
+          (item) => item.id === spdetail?.TagSpMasterId
+        );
+  
+        if (alreadyExists) return prev;
+  
+        return [...prev, spObject];
+      });
+    };
+  
+    loadSPData();
+  
+  }, []);
+
+
+  
+  useEffect(() => {
+    const html = generateExactTagHTML(
+      tag,
+      tag.layout || EMPTY_TAG.layout,
+      tag.placedVariables,
+      tag.placedLabels
+    );
+    
+   
+ 
+    setTag(prev => {
+      // Avoid infinite loop: only update if html actually changed
+      if (prev.html === html) return prev;
+      return { ...prev, html };
+    });
+  }, [
+    tag.width,
+    tag.height,
+    tag.unit,
+    tag.design,
+    tag.borderWidth,
+    tag.tagFontFamilly,
+    tag.showBarcode,
+    tag.showQR,
+    tag.codeWidth,
+    tag.codeHeight,
+    tag.qrSize,
+    tag.barcodeval,
+    tag.qrcodeval,
+    tag.layout,
+    tag.placedVariables,
+    tag.placedLabels,
+  ]);
 
   const handleClickOpen = () => {
     setOpen(true);
@@ -2026,13 +2188,7 @@ export default function CustomizeTagPage({ onNavigate, editTag }) {
     }
   }, []);
 
-  // const resetLayout = () => setTag(p => (
-  //   { 
-  //     const conf = window.confirm('Are you sure you want to reset the layout?')
-  //     if(conf){
-  //       ...p, layout: EMPTY_TAG.layout, placedVariables: [], placedLabels: [] 
-  //     }
-  //   }));
+
 
   const resetLayout = () => {
 
@@ -2044,56 +2200,9 @@ export default function CustomizeTagPage({ onNavigate, editTag }) {
     }));
   };
 
-  // const placeVariable = (spId, varId) => {
-  //   const count = tag.placedVariables.filter(p => p.varId === varId && p.spId === spId).length;
-  //   setTag(p => {
-  //     const total = p.placedVariables.length;
-  //     // Spread items in a grid pattern within 5–88% range, wrapping every 6 items
-  //     const col = total % 6;
-  //     const row = Math.floor(total / 6);
-  //     const x = Math.min(5 + col * 14 + count * 2, 80);
-  //     const y = Math.min(10 + row * 18, 80);
-  //     return {
-  //       ...p,
-  //       placedVariables: [...p.placedVariables, {
-  //         instanceId: `${spId}_${varId}_${Date.now()}`,
-  //         spId, varId,
-  //         x, y,
-  //         style: makeVarStyle(),
-  //       }],
-  //     };
-  //   });
-  // };
 
-  // const placeVariable = (spId, varId) => {
-  //   setTag(prev => {
-  //     const START_X = 5;      // fixed column
-  //     const START_Y = 5;     // first position
-  //     const GAP_Y = 14;        // vertical spacing %
 
-  //     const total = prev.placedVariables.length;
-
-  //     const x = START_X;
-  //     const y = Math.min(START_Y + total * GAP_Y, 90); // prevent overflow
-
-  //     return {
-  //       ...prev,
-  //       placedVariables: [
-  //         ...prev.placedVariables,
-  //         {
-  //           instanceId: `${spId}_${varId}_${Date.now()}`,
-  //           spId,
-  //           varId,
-  //           x,
-  //           y,
-  //           style: makeVarStyle(),
-  //         }
-  //       ],
-  //     };
-  //   });
-  // };
-
-  const placeVariable = (spId, varId) => {
+  const placeVariable = (spId, varId, varval, varLabel) => {
     setTag(prev => {
       const START_X = 5;      // first column start
       const START_Y = 5;      // first row start
@@ -2121,6 +2230,8 @@ export default function CustomizeTagPage({ onNavigate, editTag }) {
             instanceId: `${spId}_${varId}_${Date.now()}`,
             spId,
             varId,
+            varval: varval !== undefined && varval !== null ? String(varval) : "",  // ← convert to string, handles 0
+            varLabel: varLabel || "",   // ← store label too for easy access
             x,
             y,
             style: makeVarStyle(),
@@ -2199,14 +2310,31 @@ export default function CustomizeTagPage({ onNavigate, editTag }) {
   const removeLabel = id => setTag(p => ({ ...p, placedLabels: p.placedLabels.filter(pl => pl.id !== id) }));
   const updateLabel = updated => setTag(p => ({ ...p, placedLabels: p.placedLabels.map(pl => pl.id === updated.id ? updated : pl) }));
 
-  const handleSave = () => {
-    if (!tag.name.trim()) { alert('Please enter a tag name.'); return; }
+  const handleButtonClickSaveEdit = () => {
+    if (!tag.name.trim()) {
+
+      setOpenAlert(true);
+      return;
+    }
+
+    if (isEdit) {
+      // updateTag(tag.id, tag);
+      updateTag(tag.id, tag);
+      SaveApi(tag );
+    } else {
+      addTag(tag);
+      SaveApi(tag);
+    }
+
     setSaved(true);
-    setTimeout(() => onNavigate?.('list'), 900);
+
+    setTimeout(() => {
+      onNavigate?.('list');
+    }, 900);
   };
 
   const editingVarInstance = editingVarInstanceId ? tag.placedVariables.find(pv => pv.instanceId === editingVarInstanceId) : null;
-  const editingVarDef = editingVarInstance ? SP_DATA.find(s => s.id === editingVarInstance.spId)?.variables.find(v => v.id === editingVarInstance.varId) : null;
+  const editingVarDef = editingVarInstance ? spData.find(s => s.id === editingVarInstance.spId)?.variables.find(v => v.id === editingVarInstance.varId) : null;
   const editingLabel = editingLabelId ? tag.placedLabels.find(pl => pl.id === editingLabelId) : null;
 
   return (
@@ -2231,7 +2359,7 @@ export default function CustomizeTagPage({ onNavigate, editTag }) {
 
       {/* Header */}
       <div style={{ background: 'linear-gradient(135deg, #6400b8 0%, #6400b8 100%)', padding: '0 20px', boxShadow: '0 4px 24px rgba(0,0,0,0.22)', position: 'sticky', top: 0, zIndex: 200, flexShrink: 0 }}>
-      {/* <div style={{ background: 'linear-gradient(to right, #6400b8, #8d0096)', padding: '0 20px', boxShadow: '0 4px 24px rgba(0,0,0,0.22)', position: 'sticky', top: 0, zIndex: 200, flexShrink: 0 }}> */}
+        {/* <div style={{ background: 'linear-gradient(to right, #6400b8, #8d0096)', padding: '0 20px', boxShadow: '0 4px 24px rgba(0,0,0,0.22)', position: 'sticky', top: 0, zIndex: 200, flexShrink: 0 }}> */}
         <div style={{ padding: '12px 0', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <button className='reset-btn' onClick={() => onNavigate?.('list')} style={{ background: 'rgba(255,255,255,0.25)', border: 'none', borderRadius: 10, padding: '7px 13px', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'inherit', fontSize: 12, fontWeight: 600 }}>
             <ArrowLeft size={14} /> Back
@@ -2240,7 +2368,6 @@ export default function CustomizeTagPage({ onNavigate, editTag }) {
             {/* <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#c8922a,#e8b84b)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><TagIcon size={17} color="#fff" /></div> */}
             <div>
               <h1 style={{ margin: 0, color: '#fff', fontSize: 16, fontWeight: 700 }}>{isEdit ? 'Edit Tag' : 'Create New Tag'}</h1>
-
             </div>
           </div>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
@@ -2353,7 +2480,17 @@ export default function CustomizeTagPage({ onNavigate, editTag }) {
             {/* <button onClick={handleSave} style={{ display: 'flex', alignItems: 'center', gap: 7, background: saved ? 'linear-gradient(135deg,#10b981,#059669)' : 'linear-gradient(135deg,#c8922a,#e8b84b)', border: 'none', borderRadius: 11, padding: '9px 20px', color: '#fff', fontWeight: 800, fontSize: 12, cursor: 'pointer', boxShadow: '0 4px 16px rgba(200,146,42,0.4)', transition: 'all 0.3s', fontFamily: 'inherit' }}>
               <Save size={14} />{saved ? 'Saved! ✓' : isEdit ? 'Update Tag' : 'Save Tag'}
             </button> */}
-            <button className='reset-btn' onClick={resetLayout} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.25)', border: 'none', borderRadius: 10, padding: '8px 14px', color: '#fff', fontWeight: 600, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+            <Snackbar
+              open={openAlert}
+              autoHideDuration={3000}
+              onClose={() => setOpenAlert(false)}
+              anchorOrigin={{ vertical: "top", horizontal: "center" }}
+            >
+              <Alert severity="warning" variant="filled">
+                Please enter a tag name.
+              </Alert>
+            </Snackbar>
+            <button className='reset-btn' onClick={handleButtonClickSaveEdit} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(255,255,255,0.25)', border: 'none', borderRadius: 10, padding: '8px 14px', color: '#fff', fontWeight: 600, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
               <Save size={14} />{saved ? 'Saved! ✓' : isEdit ? 'Update Tag' : 'Save Tag'}
             </button>
           </div>
@@ -2362,8 +2499,6 @@ export default function CustomizeTagPage({ onNavigate, editTag }) {
 
       {/* 3-Panel Layout */}
       <div style={{ display: 'grid', gridTemplateColumns: '310px 1fr 280px ', minHeight: 0, height: 'calc(100vh - 62px)' }}>
-
-
 
         {/* Panel 2 */}
         <div style={{ background: '#f8f9fe', borderRight: '2px solid #f0f2f8', display: 'flex', flexDirection: 'column' }}>
@@ -2396,7 +2531,6 @@ export default function CustomizeTagPage({ onNavigate, editTag }) {
               {tag.placedVariables.length > 0 && <span style={{ fontSize: 10, color: '#0284c7', background: '#e0f2fe', padding: '2px 9px', borderRadius: 20, fontWeight: 700 }}>{tag.placedVariables.length} var</span>}
             </div>
           </div>
-
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'repeating-conic-gradient(#dde3ec 0% 25%,#eef0f6 0% 50%) 0 0 / 18px 18px', overflow: 'hidden' }}>
             <DraggableCanvas
               tag={tag}
@@ -2408,6 +2542,7 @@ export default function CustomizeTagPage({ onNavigate, editTag }) {
               onEditInstance={setEditingVarInstanceId}
               onRemoveLabel={removeLabel}
               onEditLabel={setEditingLabelId}
+              spData={spData}
             />
           </div>
 
@@ -2430,12 +2565,15 @@ export default function CustomizeTagPage({ onNavigate, editTag }) {
             <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, color: '#6400b8', background: 'rgb(243, 232, 255)', padding: '2px 8px', borderRadius: 10 }}>{tag.placedVariables.length} placed</span>
           </div>
           <div className='Panel1_overflow' style={{ flex: 1, overflowY: 'auto' }}>
+            {/* {console.log("placedVariables:", tag.placedVariables)} */}
+
             <Panel1Variables
               tag={tag}
               placedVariables={tag.placedVariables}
               onPlace={placeVariable}
               onRemovePlaced={removePlaced}
               onEditInstance={setEditingVarInstanceId}
+              spData={spData}
 
             />
           </div>
