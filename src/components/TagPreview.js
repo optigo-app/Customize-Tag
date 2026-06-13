@@ -6,7 +6,7 @@ const INCH_TO_PX = 96;
 function toPx(value, unit) {
   return unit === 'inch' ? value * INCH_TO_PX : value * MM_TO_PX;
 }
- 
+
 // ─── Design 1: Classic dark header ───────────────────────────────────────────
 function DesignTag1({ tag, scale }) {
   const f = (n) => tag.fontSize * scale * n;
@@ -125,37 +125,43 @@ export const DESIGN_COMPONENTS = {
   tag4: DesignTag4,
 };
 
-export default function TagPreview({ tag, maxWidth = 320, maxHeight = 220 }) {
-  const rawW = toPx(tag.width || 60, tag.unit || 'mm');
-  const rawH = toPx(tag.height || 30, tag.unit || 'mm');
+export default function TagPreview({ tag, maxWidth = 140, maxHeight = 80 }) {
+  const html = tag?.HtmlTemplate || tag?.html || '';
 
-  // Scale to fit, allow up to 2× for small tags so they look big in preview
+  // Parse actual pixel size from stored mm dimensions
+  const MM_TO_PX = 3.7795275591;
+  const rawW = (Number(tag?.width) || 60) * MM_TO_PX;
+  const rawH = (Number(tag?.height) || 30) * MM_TO_PX;
+  const scale = Math.min(maxWidth / rawW, maxHeight / rawH);
 
-  
-  console.log("TCL: TagPreview -> tag", tag)
-  const scaleW = maxWidth / rawW;
-  const scaleH = maxHeight / rawH;
-  const scale = Math.min(scaleW, scaleH, 2.2);
-
-  const dispW = rawW * scale;
-  const dispH = rawH * scale;
-  
-  console.log("TCL: TagPreview -> tag", tag)
-  const DesignComponent = DESIGN_COMPONENTS[tag.design] || DesignTag1;
+  if (!html) {
+    // Fallback if no HTML saved yet
+    return (
+      <div style={{
+        width: maxWidth, height: maxHeight, background: '#f8f9fe',
+        border: '1px dashed #e5e7eb', borderRadius: 6, display: 'flex',
+        alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#94a3b8'
+      }}>
+        No preview
+      </div>
+    );
+  }
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      width: maxWidth, height: maxHeight,
+      width: maxWidth, height: maxHeight, overflow: 'hidden',
+      borderRadius: 6, border: '1px solid #e5e7eb', flexShrink: 0,
+      background: '#fff', position: 'relative'
     }}>
       <div style={{
-        width: dispW, height: dispH,
-        flexShrink: 0,
-        boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-        borderRadius: 4,
-      }}>
-        <DesignComponent tag={tag} scale={scale} />
-      </div>
+        transform: `scale(${scale})`,
+        transformOrigin: 'top left',
+        width: rawW,
+        height: rawH,
+        pointerEvents: 'none',
+      }}
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
     </div>
   );
 }

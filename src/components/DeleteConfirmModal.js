@@ -1,7 +1,7 @@
 import React from 'react';
 import { AlertTriangle, Trash2, X } from 'lucide-react';
 
-export default function DeleteConfirmModal({ tag, onConfirm, onCancel }) {
+export default function DeleteConfirmModal({ tag, onConfirm, onCancel, loading = false }) {
   return (
     <div style={{
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
@@ -24,15 +24,16 @@ export default function DeleteConfirmModal({ tag, onConfirm, onCancel }) {
         </div>
         <h3 style={{ margin: '0 0 8px', fontFamily: 'Georgia, serif', fontSize: 20, color: '#1a1a2e' }}>Delete Tag?</h3>
         <p style={{ margin: '0 0 24px', color: '#666', fontSize: 14, lineHeight: 1.6 }}>
-          Are you sure you want to delete <strong style={{ color: '#1a1a2e' }}>"{tag?.name}"</strong>?<br />
+          Are you sure you want to delete <strong style={{ color: '#1a1a2e' }}>"{tag?.name || tag?.tagname}"</strong>?<br />
           This action cannot be undone.
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-          <button onClick={onCancel} style={{
+          <button disabled={loading} onClick={onCancel} style={{
             flex: 1, padding: '10px 20px', borderRadius: 10,
             border: '2px solid #e5e7eb', background: '#fff',
-            fontSize: 14, fontWeight: 600, cursor: 'pointer', color: '#555',
+            fontSize: 14, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', color: '#555',
             transition: 'all 0.2s', fontFamily: 'inherit',
+            opacity: loading ? 0.7 : 1,
           }}
             onMouseEnter={e => { e.target.style.background = '#f9fafb'; }}
             onMouseLeave={e => { e.target.style.background = '#fff'; }}
@@ -40,17 +41,18 @@ export default function DeleteConfirmModal({ tag, onConfirm, onCancel }) {
             <X size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
             Cancel
           </button>
-          <button onClick={onConfirm} style={{
+          <button disabled={loading} onClick={onConfirm} style={{
             flex: 1, padding: '10px 20px', borderRadius: 10,
             border: 'none', background: 'linear-gradient(135deg, #e63946, #c1121f)',
-            fontSize: 14, fontWeight: 700, cursor: 'pointer', color: '#fff',
+            fontSize: 14, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', color: '#fff',
             transition: 'all 0.2s', fontFamily: 'inherit', boxShadow: '0 4px 14px rgba(230,57,70,0.4)',
+            opacity: loading ? 0.75 : 1,
           }}
             onMouseEnter={e => { e.target.style.transform = 'translateY(-1px)'; }}
             onMouseLeave={e => { e.target.style.transform = 'translateY(0)'; }}
           >
             <Trash2 size={14} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-            Delete
+            {loading ? 'Deleting...' : 'Delete'}
           </button>
         </div>
       </div>

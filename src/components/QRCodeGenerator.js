@@ -8,6 +8,7 @@ function QRCodeGenerator({ value = "dummy", size = 20 }) {
 
   useEffect(() => {
     if (!svgRef.current) return;
+    let isMounted = true;
 
     const pxSize = mmToPx(size);
 
@@ -17,6 +18,7 @@ function QRCodeGenerator({ value = "dummy", size = 20 }) {
       margin: 0,
       errorCorrectionLevel: "M", // L M Q H
     }).then(svgString => {
+      if (!isMounted || !svgRef.current) return;
       svgRef.current.innerHTML = svgString;
 
       // Force physical size
@@ -27,6 +29,9 @@ function QRCodeGenerator({ value = "dummy", size = 20 }) {
       }
     });
 
+    return () => {
+      isMounted = false;
+    };
   }, [value, size]);
 
   return <div ref={svgRef} />;
