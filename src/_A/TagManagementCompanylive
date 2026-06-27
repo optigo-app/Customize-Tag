@@ -1,0 +1,454 @@
+USE [404146_CentralUser]
+GO
+/****** Object:  StoredProcedure [dbo].[TagManagementCompanylive]    Script Date: 18-06-2026 14:31:59 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+ALTER PROCEDURE [dbo].[TagManagementCompanylive]
+     @con NVARCHAR(MAX) = ''
+    ,@p   NVARCHAR(MAX) = ''
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @FromDate  AS DATETIME = ISNULL([dbo].[UTC_CSERVERLOCAL](GETDATE()), GETDATE())
+    DECLARE @spLogName AS NVARCHAR(MAX)
+
+    SELECT @spLogName = COALESCE(@spLogName + CHAR(13) + '    , ', '')
+                      + CONCAT(A.name, ' = ''', A.value, '''')
+    FROM (
+        SELECT name, value FROM (VALUES
+            (1, '@con',   REPLACE(CAST(@con AS NVARCHAR(MAX)), '''', '''''')),
+            (2, '@p',     REPLACE(CAST(@p   AS NVARCHAR(MAX)), '''', '''''')),
+            (1, '--@con', REPLACE(CAST([dbo].Base64Decode(@con) AS NVARCHAR(MAX)), '''', '''''')),
+            (2, '--@p',   REPLACE(CAST([dbo].Base64Decode(@p)   AS NVARCHAR(MAX)), '''', ''''''))
+        ) p(num, name, value)
+    ) AS A(name, value)
+
+    SET @spLogName = CONCAT('exec [404146_CentralUser].[dbo].', OBJECT_NAME(@@PROCID), ' ', @spLogName)
+
+    DECLARE
+         @DBNAME        NVARCHAR(200) = '404146_CentralUser'
+        ,@appuserid     NVARCHAR(100) = ''
+        ,@IPAddress     NVARCHAR(50)  = ''
+        ,@FormName      NVARCHAR(200) = ''
+        ,@mode          NVARCHAR(100) = ''
+        ,@id            NVARCHAR(50)  = ''
+        ,@Authorization NVARCHAR(100) = ''
+        ,@domain        NVARCHAR(50)  = ''
+        ,@version       NVARCHAR(10)  = ''
+
+    BEGIN TRY
+        SELECT
+             @id            = iif(isnull(element_id,0) = 1, StringValue, @id)
+            ,@mode          = iif(isnull(element_id,0) = 2, StringValue, @mode)
+            ,@appuserid     = iif(isnull(element_id,0) = 4, StringValue, @appuserid)
+            ,@IPAddress     = iif(isnull(element_id,0) = 5, StringValue, @IPAddress)
+            ,@FormName      = iif(isnull(element_id,0) = 6, StringValue, @FormName)
+            ,@Authorization = iif(isnull(element_id,0) = 7, StringValue, @Authorization)
+            ,@domain        = iif(isnull(element_id,0) = 8, StringValue, @domain)
+            ,@version       = iif(isnull(element_id,0) = 9, StringValue, @version)
+        FROM [404146_CentralUser].[dbo].[parseJSON]([dbo].Base64Decode(@con))
+    END TRY
+    BEGIN CATCH
+        DECLARE @decodedCon NVARCHAR(MAX) = [dbo].Base64Decode(@con)
+        SELECT
+             @id            = JSON_VALUE(@decodedCon, '$.id')
+            ,@mode          = JSON_VALUE(@decodedCon, '$.mode')
+            ,@appuserid     = JSON_VALUE(@decodedCon, '$.appuserid')
+            ,@IPAddress     = JSON_VALUE(@decodedCon, '$.IPAddress')
+            ,@FormName      = JSON_VALUE(@decodedCon, '$.FormName')
+            ,@Authorization = JSON_VALUE(@decodedCon, '$.Authorization')
+            ,@domain        = JSON_VALUE(@decodedCon, '$.domain')
+            ,@version       = JSON_VALUE(@decodedCon, '$.version')
+    END CATCH
+
+    PRINT CONCAT('--@mode : ', @mode)
+
+    -- =============================================
+    -- All company-specific variables
+    -- =============================================
+    DECLARE
+         @TagMasterId     BIGINT        = NULL
+        ,@TagName         NVARCHAR(200) = ''
+        ,@HtmlTemplate    NVARCHAR(MAX) = ''
+        ,@TagSpName       NVARCHAR(200) = ''
+        ,@DefaultTag      BIT           = 0
+        ,@TagSpId         INT           = NULL
+        ,@TagUnitId       INT           = NULL
+        ,@Width           DECIMAL(10,2) = NULL
+        ,@Height          DECIMAL(10,2) = NULL
+        ,@FontPt          INT           = NULL
+        ,@BorderPx        INT           = NULL
+        ,@BodyWidth       DECIMAL(10,2) = NULL
+        ,@TailWidth       DECIMAL(10,2) = NULL
+        ,@FontFamilyId    INT           = NULL
+        ,@showBarcode     BIT           = 0
+        ,@showQr          BIT           = 0
+        ,@BarcodeWidth    DECIMAL(10,2) = NULL
+        ,@BarcodeHeight   DECIMAL(10,2) = NULL
+        ,@BarcodeData     NVARCHAR(100) = ''
+        ,@QrWidth         DECIMAL(10,2) = NULL
+        ,@QrData          NVARCHAR(100) = ''
+        ,@Design          NVARCHAR(20)  = 'tag1'
+        ,@BarcodeX        DECIMAL(6,2)  = NULL
+        ,@BarcodeY        DECIMAL(6,2)  = NULL
+        ,@QrX             DECIMAL(6,2)  = NULL
+        ,@QrY             DECIMAL(6,2)  = NULL
+        ,@LableData       NVARCHAR(MAX) = ''
+        ,@VariableData    NVARCHAR(MAX) = ''
+        ,@TagVariableJson NVARCHAR(MAX) = ''
+        ,@TagLableJson    NVARCHAR(MAX) = ''
+        ,@SearchText      NVARCHAR(MAX) = ''
+        ,@PageSize        INT           = 0
+        ,@CurrentPage     INT           = 0
+        ,@CompanyDbName   NVARCHAR(200) = ''   -- single company DB (required for all modes here)
+
+    BEGIN TRY
+
+        IF (ISNULL(@p, '') <> '')
+        BEGIN
+            BEGIN TRY
+                SELECT
+                     @HtmlTemplate    = ISNULL(MAX(CASE WHEN [key] = 'HtmlTemplate'   THEN [value] END), '')
+                    ,@LableData       = ISNULL(MAX(CASE WHEN [key] = 'LableData'      THEN [value] END), '')
+                    ,@VariableData    = ISNULL(MAX(CASE WHEN [key] = 'VariableData'   THEN [value] END), '')
+                    ,@TagVariableJson = ISNULL(MAX(CASE WHEN [key] = 'TagVariables'   THEN [value] END), '')
+                    ,@TagLableJson    = ISNULL(MAX(CASE WHEN [key] = 'TagLables'      THEN [value] END), '')
+                FROM OPENJSON(@p)
+
+                SELECT
+                     @TagMasterId  = TRY_CAST(NULLIF(LTRIM(RTRIM(JSON_VALUE(@p, '$.TagMasterId'))), '') AS BIGINT)
+                    ,@TagName      = ISNULL(JSON_VALUE(@p, '$.TagName'),    '')
+                    ,@TagSpName    = ISNULL(JSON_VALUE(@p, '$.SpName'),     '')
+                    ,@DefaultTag   = ISNULL(TRY_CAST(JSON_VALUE(@p, '$.DefaultTag') AS BIT), 0)
+                    ,@TagSpId      = TRY_CAST(NULLIF(LTRIM(RTRIM(JSON_VALUE(@p, '$.TagSpId'))),   '') AS INT)
+                    ,@TagUnitId    = TRY_CAST(NULLIF(LTRIM(RTRIM(JSON_VALUE(@p, '$.TagUnitId'))), '') AS INT)
+                    ,@Width        = TRY_CAST(JSON_VALUE(@p, '$.Width')        AS DECIMAL(10,2))
+                    ,@Height       = TRY_CAST(JSON_VALUE(@p, '$.Height')       AS DECIMAL(10,2))
+                    ,@FontPt       = TRY_CAST(JSON_VALUE(@p, '$.FontPt')       AS INT)
+                    ,@BorderPx     = TRY_CAST(JSON_VALUE(@p, '$.BorderPx')     AS INT)
+                    ,@BodyWidth    = TRY_CAST(JSON_VALUE(@p, '$.BodyWidth')    AS DECIMAL(10,2))
+                    ,@TailWidth    = TRY_CAST(JSON_VALUE(@p, '$.TailWidth')    AS DECIMAL(10,2))
+                    ,@FontFamilyId = TRY_CAST(JSON_VALUE(@p, '$.FontFamilyId') AS INT)
+                    ,@showBarcode  = ISNULL(TRY_CAST(JSON_VALUE(@p, '$.showBarcode') AS BIT), 0)
+                    ,@showQr       = ISNULL(TRY_CAST(JSON_VALUE(@p, '$.showQr')      AS BIT), 0)
+                    ,@BarcodeWidth = TRY_CAST(JSON_VALUE(@p, '$.BarcodeWidth')  AS DECIMAL(10,2))
+                    ,@BarcodeHeight= TRY_CAST(JSON_VALUE(@p, '$.BarcodeHeight') AS DECIMAL(10,2))
+                    ,@BarcodeData  = ISNULL(JSON_VALUE(@p, '$.BarcodeData'), '')
+                    ,@QrWidth      = TRY_CAST(JSON_VALUE(@p, '$.QrWidth')       AS DECIMAL(10,2))
+                    ,@QrData       = ISNULL(JSON_VALUE(@p, '$.QrData'),     '')
+                    ,@Design       = ISNULL(JSON_VALUE(@p, '$.Design'),     'tag1')
+                    ,@BarcodeX     = TRY_CAST(JSON_VALUE(@p, '$.BarcodeX')     AS DECIMAL(6,2))
+                    ,@BarcodeY     = TRY_CAST(JSON_VALUE(@p, '$.BarcodeY')     AS DECIMAL(6,2))
+                    ,@QrX          = TRY_CAST(JSON_VALUE(@p, '$.QrX')          AS DECIMAL(6,2))
+                    ,@QrY          = TRY_CAST(JSON_VALUE(@p, '$.QrY')          AS DECIMAL(6,2))
+                    ,@SearchText   = ISNULL(JSON_VALUE(@p, '$.SearchText'),  '')
+                    ,@PageSize     = ISNULL(TRY_CAST(JSON_VALUE(@p, '$.PageSize')    AS INT), 0)
+                    ,@CurrentPage  = ISNULL(TRY_CAST(JSON_VALUE(@p, '$.CurrentPage') AS INT), 0)
+                    ,@CompanyDbName = ISNULL(JSON_VALUE(@p, '$.CompanyDbName'), '')
+            END TRY
+            BEGIN CATCH
+                PRINT CONCAT('--@p parse error: ', ERROR_MESSAGE())
+            END CATCH
+        END
+
+        -- CompanyDbName is REQUIRED for this SP
+        IF (ISNULL(@CompanyDbName,'') = '')
+        BEGIN
+            SELECT 0 AS stat, 'CompanyDbName is required for this SP.' AS stat_msg, 1001 AS stat_code
+            RETURN
+        END
+
+        -- =============================================
+        --  MODE: EDITTAG  (Company DB)
+        -- =============================================
+        IF (@mode = 'EDITTAG')
+        BEGIN
+            PRINT '--EDITTAG (Company)'
+
+            IF (ISNULL(@TagMasterId,0) = 0)
+            BEGIN SELECT 0 AS stat, 'TagMasterId is required.' AS stat_msg, 1001 AS stat_code RETURN END
+
+            BEGIN TRY
+                BEGIN TRAN
+
+                DECLARE @dynEdit NVARCHAR(MAX) = N'
+                UPDATE [' + @CompanyDbName + '].dbo.TagMaster SET
+                     TagName      = IIF(ISNULL(@TagName,'''')      <> '''', @TagName,      TagName)
+                    ,HtmlTemplate = IIF(ISNULL(@HtmlTemplate,'''') <> '''', @HtmlTemplate, HtmlTemplate)
+                    ,SpName       = IIF(ISNULL(@SpName,'''')       <> '''', NULLIF(@SpName,''''), SpName)
+                    ,IsDefault    = @DefaultTag
+                WHERE id = @TagMasterId
+
+                UPDATE [' + @CompanyDbName + '].dbo.TagDetail SET
+                     Width         = ISNULL(@Width,         Width)
+                    ,Height        = ISNULL(@Height,        Height)
+                    ,FontPt        = ISNULL(@FontPt,        FontPt)
+                    ,BorderPx      = ISNULL(@BorderPx,      BorderPx)
+                    ,BodyWidth     = ISNULL(@BodyWidth,      BodyWidth)
+                    ,TailWidth     = ISNULL(@TailWidth,      TailWidth)
+                    ,FontFamilyId  = ISNULL(@FontFamilyId,   FontFamilyId)
+                    ,showBarcode   = @showBarcode
+                    ,showQr        = @showQr
+                    ,BarcodeWidth  = ISNULL(@BarcodeWidth,   BarcodeWidth)
+                    ,BarcodeHeight = ISNULL(@BarcodeHeight,  BarcodeHeight)
+                    ,BarcodeData   = ISNULL(NULLIF(@BarcodeData,''''),  BarcodeData)
+                    ,QrWidth       = ISNULL(@QrWidth,        QrWidth)
+                    ,QrData        = ISNULL(NULLIF(@QrData,''''),       QrData)
+                    ,Design        = ISNULL(NULLIF(@Design,''''),       Design)
+                    ,BarcodeX      = ISNULL(@BarcodeX,       BarcodeX)
+                    ,BarcodeY      = ISNULL(@BarcodeY,       BarcodeY)
+                    ,QrX           = ISNULL(@QrX,            QrX)
+                    ,QrY           = ISNULL(@QrY,            QrY)
+                    ,LableData     = ISNULL(NULLIF(@LableData,''''),    LableData)
+                    ,VariableData  = ISNULL(NULLIF(@VariableData,''''), VariableData)
+                WHERE TagId = @TagMasterId'
+
+                EXEC sp_executesql @dynEdit,
+                    N'@TagMasterId BIGINT,@TagName NVARCHAR(200),@HtmlTemplate NVARCHAR(MAX),
+                      @SpName NVARCHAR(200),@DefaultTag BIT,
+                      @Width DECIMAL(10,2),@Height DECIMAL(10,2),@FontPt INT,@BorderPx INT,
+                      @BodyWidth DECIMAL(10,2),@TailWidth DECIMAL(10,2),@FontFamilyId INT,
+                      @showBarcode BIT,@showQr BIT,
+                      @BarcodeWidth DECIMAL(10,2),@BarcodeHeight DECIMAL(10,2),
+                      @BarcodeData NVARCHAR(100),@QrWidth DECIMAL(10,2),@QrData NVARCHAR(100),
+                      @Design NVARCHAR(20),@BarcodeX DECIMAL(6,2),@BarcodeY DECIMAL(6,2),
+                      @QrX DECIMAL(6,2),@QrY DECIMAL(6,2),
+                      @LableData NVARCHAR(MAX),@VariableData NVARCHAR(MAX)',
+                    @TagMasterId,@TagName,@HtmlTemplate,@TagSpName,@DefaultTag,
+                    @Width,@Height,@FontPt,@BorderPx,@BodyWidth,@TailWidth,@FontFamilyId,
+                    @showBarcode,@showQr,@BarcodeWidth,@BarcodeHeight,
+                    @BarcodeData,@QrWidth,@QrData,@Design,
+                    @BarcodeX,@BarcodeY,@QrX,@QrY,
+                    @LableData,@VariableData
+
+                IF (ISNULL(@TagVariableJson,'') <> '')
+                BEGIN
+                    DECLARE @dynVarE NVARCHAR(MAX) = N'
+                    DELETE FROM [' + @CompanyDbName + '].dbo.TagVariable WHERE TagMasterId=@MasterId
+                    INSERT INTO [' + @CompanyDbName + '].dbo.TagVariable
+                        (TagMasterId,VariableName,SpcolumnName,Unit,FontSize,Weight,
+                         [Decimal],Trim,RoundOff,PosX,PosY)
+                    SELECT @MasterId,
+                        JSON_VALUE(v.value,''$.VariableName''),
+                        JSON_VALUE(v.value,''$.SpColumnName''),
+                        NULLIF(JSON_VALUE(v.value,''$.Unit''),''''),
+                        TRY_CAST(JSON_VALUE(v.value,''$.FontSize'') AS INT),
+                        TRY_CAST(JSON_VALUE(v.value,''$.Weight'') AS INT),
+                        ISNULL(TRY_CAST(JSON_VALUE(v.value,''$.Decimal'') AS INT),0),
+                        ISNULL(TRY_CAST(JSON_VALUE(v.value,''$.Trim'') AS INT),0),
+                        ISNULL(TRY_CAST(JSON_VALUE(v.value,''$.RoundOff'') AS INT),0),
+                        TRY_CAST(JSON_VALUE(v.value,''$.PosX'') AS DECIMAL(6,2)),
+                        TRY_CAST(JSON_VALUE(v.value,''$.PosY'') AS DECIMAL(6,2))
+                    FROM OPENJSON(@VarJson) AS v
+                    WHERE ISNULL(JSON_VALUE(v.value,''$.VariableName''),'''') <> '''''
+
+                    EXEC sp_executesql @dynVarE,
+                        N'@MasterId BIGINT,@VarJson NVARCHAR(MAX)',
+                        @TagMasterId,@TagVariableJson
+                END
+
+                IF (ISNULL(@TagLableJson,'') <> '')
+                BEGIN
+                    DECLARE @dynLblE NVARCHAR(MAX) = N'
+                    DELETE FROM [' + @CompanyDbName + '].dbo.TagLable WHERE TagMasterId=@MasterId
+                    INSERT INTO [' + @CompanyDbName + '].dbo.TagLable
+                        (TagMasterId,LableTitle,FontSize,Weight,Italic,PosX,PosY)
+                    SELECT @MasterId,
+                        JSON_VALUE(l.value,''$.LableTitle''),
+                        TRY_CAST(JSON_VALUE(l.value,''$.FontSize'') AS INT),
+                        TRY_CAST(JSON_VALUE(l.value,''$.Weight'') AS INT),
+                        ISNULL(TRY_CAST(JSON_VALUE(l.value,''$.Italic'') AS BIT),0),
+                        TRY_CAST(JSON_VALUE(l.value,''$.PosX'') AS DECIMAL(6,2)),
+                        TRY_CAST(JSON_VALUE(l.value,''$.PosY'') AS DECIMAL(6,2))
+                    FROM OPENJSON(@LblJson) AS l
+                    WHERE ISNULL(JSON_VALUE(l.value,''$.LableTitle''),'''') <> '''''
+
+                    EXEC sp_executesql @dynLblE,
+                        N'@MasterId BIGINT,@LblJson NVARCHAR(MAX)',
+                        @TagMasterId,@TagLableJson
+                END
+
+                COMMIT TRAN
+                SELECT 1 AS stat, 'Tag updated in company successfully.' AS stat_msg, @TagMasterId AS UpdatedId
+            END TRY
+            BEGIN CATCH
+                IF @@TRANCOUNT > 0 ROLLBACK TRAN
+                SELECT 0 AS stat, ERROR_MESSAGE() AS stat_msg, 1099 AS stat_code
+            END CATCH
+        END
+
+        -- =============================================
+        --  MODE: GETTAG  (Company DB)
+        -- =============================================
+        ELSE IF (@mode = 'GETTAG')
+        BEGIN
+            PRINT '--GETTAG (Company)'
+
+            -- Single tag fetch (for edit form)
+            IF (ISNULL(@TagMasterId,0) > 0)
+            BEGIN
+                DECLARE @dynGetS NVARCHAR(MAX)
+
+                SET @dynGetS = N'
+                SELECT id, tagname, uniqueno,
+                       ISNULL(HtmlTemplate,'''') AS HtmlTemplate,
+                       ISNULL(SpName,      '''') AS SpName,
+                       ISNULL(IsDefault,    0)   AS IsDefault,
+                       ISNULL(IsBarcodeQR,  0)   AS IsBarcodeQR,
+                       ISNULL(AssignCompany,'''') AS AssignCompany,
+					   CentralTagMasterId
+                FROM [' + @CompanyDbName + '].dbo.TagMaster WITH (NOLOCK)
+                WHERE id = @TagMasterId'
+                EXEC sp_executesql @dynGetS, N'@TagMasterId BIGINT', @TagMasterId
+
+                SET @dynGetS = N'
+                SELECT id, TagId, TagName, TagSpId, TagUnitId,
+                       Width, Height, FontPt, BorderPx, BodyWidth, TailWidth,
+                       FontFamilyId, showBarcode, showQr,
+                       BarcodeWidth, BarcodeHeight,
+                       ISNULL(BarcodeData,'''') AS BarcodeData,
+                       QrWidth,
+                       ISNULL(QrData,     '''') AS QrData,
+                       ISNULL(LableData,  '''') AS LableData,
+                       ISNULL(VariableData,'''') AS VariableData,
+                       ISNULL(Design, ''tag1'')  AS Design,
+                       BarcodeX, BarcodeY, QrX, QrY
+                FROM [' + @CompanyDbName + '].dbo.TagDetail WITH (NOLOCK)
+                WHERE TagId = @TagMasterId ORDER BY id'
+                EXEC sp_executesql @dynGetS, N'@TagMasterId BIGINT', @TagMasterId
+
+                SET @dynGetS = N'
+                SELECT id, TagMasterId, VariableName, SpcolumnName,
+                       ISNULL(Unit,'''') AS Unit,
+                       FontSize, Weight,
+                       ISNULL([Decimal],0) AS [Decimal],
+                       ISNULL(Trim,0)      AS Trim,
+                       ISNULL(RoundOff,0)  AS RoundOff,
+                       PosX, PosY
+                FROM [' + @CompanyDbName + '].dbo.TagVariable WITH (NOLOCK)
+                WHERE TagMasterId = @TagMasterId ORDER BY id'
+                EXEC sp_executesql @dynGetS, N'@TagMasterId BIGINT', @TagMasterId
+
+                SET @dynGetS = N'
+                SELECT id, TagMasterId, LableTitle,
+                       FontSize, Weight,
+                       ISNULL(Italic,0) AS Italic,
+                       PosX, PosY
+                FROM [' + @CompanyDbName + '].dbo.TagLable WITH (NOLOCK)
+                WHERE TagMasterId = @TagMasterId ORDER BY id'
+                EXEC sp_executesql @dynGetS, N'@TagMasterId BIGINT', @TagMasterId
+            END
+            ELSE
+            BEGIN
+                -- Paginated list for company
+                DECLARE @dynList NVARCHAR(MAX) = N'
+				;WITH cte AS (
+					SELECT
+						 TM.id, TM.tagname, TM.uniqueno
+						,ISNULL(TM.HtmlTemplate,'''') AS HtmlTemplate
+						,ISNULL(TM.SpName,      '''') AS SpName
+						,ISNULL(TM.IsDefault,    0)   AS IsDefault
+						,ISNULL(TM.IsBarcodeQR,  0)   AS IsBarcodeQR
+						,ISNULL(TM.AssignCompany,'''') AS AssignCompany
+						,TM.CentralTagMasterId
+						,COUNT(1) OVER ()                        AS TotalRecords
+						,ROW_NUMBER() OVER (ORDER BY TM.id DESC) AS RowNum
+					FROM [' + @CompanyDbName + '].dbo.TagMaster TM WITH (NOLOCK)
+					WHERE TM.IsActive = 1
+					AND (
+						ISNULL(@SearchText,'''') = ''''
+						OR TM.tagname  LIKE ''%'' + @SearchText + ''%''
+						OR TM.uniqueno LIKE ''%'' + @SearchText + ''%''
+					)
+				)
+				SELECT id, tagname, uniqueno, HtmlTemplate, AssignCompany, CentralTagMasterId,
+					   SpName, IsDefault, IsBarcodeQR, TotalRecords, RowNum
+				FROM cte
+				WHERE CASE
+						WHEN @PageSize > 0 AND @CurrentPage > 0
+							THEN IIF(RowNum > @LB AND RowNum < @UB, 1, 0)
+						ELSE 1
+					  END = 1
+				ORDER BY RowNum'
+
+                DECLARE @LB2 INT = (@CurrentPage - 1) * @PageSize
+                DECLARE @UB2 INT = (@CurrentPage  * @PageSize) + 1
+
+                EXEC sp_executesql @dynList,
+                    N'@SearchText NVARCHAR(MAX),@PageSize INT,@CurrentPage INT,@LB INT,@UB INT',
+                    @SearchText,@PageSize,@CurrentPage,@LB2,@UB2
+            END
+        END
+
+        -- =============================================
+        --  MODE: DELETETAG  (Company DB)
+        -- =============================================
+        ELSE IF (@mode = 'DELETETAG')
+        BEGIN
+            PRINT '--DELETETAG (Company)'
+
+            IF (ISNULL(@TagMasterId,0) = 0)
+            BEGIN SELECT 0 AS stat, 'TagMasterId is required.' AS stat_msg, 1001 AS stat_code RETURN END
+
+            BEGIN TRY
+                BEGIN TRAN
+
+                DECLARE @dynDel NVARCHAR(MAX) = N'
+                DELETE FROM [' + @CompanyDbName + '].dbo.TagLable    WHERE TagMasterId = @MasterId
+                DELETE FROM [' + @CompanyDbName + '].dbo.TagVariable WHERE TagMasterId = @MasterId
+                DELETE FROM [' + @CompanyDbName + '].dbo.TagDetail   WHERE TagId       = @MasterId
+                DELETE FROM [' + @CompanyDbName + '].dbo.TagMaster   WHERE id          = @MasterId'
+
+                EXEC sp_executesql @dynDel,
+                    N'@MasterId BIGINT', @TagMasterId
+
+                COMMIT TRAN
+                SELECT 1 AS stat, 'Tag deleted from company successfully.' AS stat_msg, @TagMasterId AS DeletedId
+            END TRY
+            BEGIN CATCH
+                IF @@TRANCOUNT > 0 ROLLBACK TRAN
+                SELECT 0 AS stat, ERROR_MESSAGE() AS stat_msg, 1099 AS stat_code
+            END CATCH
+        END
+
+        ELSE IF (ISNULL(@mode, '') = 'getspcols')   -- ← add ELSE here
+        BEGIN
+            PRINT '--getall_sp_withcolumns'
+
+            SELECT
+                 M.Id       AS TagSpMasterId
+                ,M.SpName
+            FROM dbo.TagSpMaster M WITH (NOLOCK)
+            ORDER BY M.Id
+
+            SELECT
+                 C.Id               AS ColumnId
+                ,C.TagSpMasterId
+                ,C.ColumnName
+                ,ISNULL(C.DisplayName, C.ColumnName) AS DisplayName
+            FROM dbo.TagSpColumn C WITH (NOLOCK)
+            ORDER BY C.TagSpMasterId, C.Id
+
+        END
+
+		BEGIN
+			SELECT 0 AS stat, CONCAT('Unknown mode: ', ISNULL(@mode,'NULL')) AS stat_msg, 1099 AS stat_code
+		END
+
+--------------------------------------------------------------------------------------------------------------	
+Execute [GetTxLog] @spLogName,@FromDate,@DBNAME,@appuserid,@IPAddress,@FormName,'TagPrintConfiguration',@mode
+END TRY
+BEGIN CATCH	
+	
+	SELECT 
+		0 as stat
+		,'"Contact your Admin"' as stat_msg
+		,1001 as stat_code
+		,'null' as device_token
+	
+	EXECUTE [GetErrlog] @appuserid,@FromDate,@DBNAME,@IPAddress,@FormName,'TagPrintConfiguration',@mode;
+END CATCH;
+END	

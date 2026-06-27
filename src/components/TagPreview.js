@@ -1,4 +1,5 @@
 import React from 'react';
+import { decodeHtmlSafe } from '../api/SaveApi';
 
 const MM_TO_PX = 3.78;
 const INCH_TO_PX = 96;
@@ -160,7 +161,7 @@ export default function TagPreview({ tag, maxWidth = 140, maxHeight = 80 }) {
         height: rawH,
         pointerEvents: 'none',
       }}
-        dangerouslySetInnerHTML={{ __html: html }}
+        dangerouslySetInnerHTML={{ __html: decodeHtmlSafe(html) }}
       />
     </div>
   );

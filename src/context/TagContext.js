@@ -3,11 +3,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const TagContext = createContext();
-export function TagProvider({ children }) {
 
+export function TagProvider({ children }) {
   const [tags, setTags] = useState(() => {
     const stored = localStorage.getItem("tags");
-    return JSON.parse(stored)
+    return stored ? JSON.parse(stored) : [];
   });
 
   useEffect(() => {
@@ -15,12 +15,12 @@ export function TagProvider({ children }) {
   }, [tags]);
 
   const addTag = (tag) => {
-    setTags((prev) => [...prev, { ...tag, id: Date.now() }]);
+    setTags((prev) => [...prev, { ...tag, id: tag.id ?? Date.now() }]);
   };
 
   const updateTag = (id, updatedTag) => {
     setTags((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, ...updatedTag } : t))
+      prev.map((t) => (String(t.id) === String(id) ? { ...t, ...updatedTag } : t))
     );
   };
 
